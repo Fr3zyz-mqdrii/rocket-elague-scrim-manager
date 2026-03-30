@@ -4,24 +4,44 @@ from firebase_admin import credentials, firestore
 from datetime import datetime, timedelta
 import pandas as pd
 import os
+import json
 
 # ========== CONFIGURAZIONE PAGINA ==========
 st.set_page_config(page_title="Rocket Scrim", page_icon="🏎️", layout="wide")
 
 # ========== FIREBASE ==========
-key_file = None
-for f in os.listdir('.'):
-    if f.endswith('.json') and f != 'dati_locali.json':
-        key_file = f
-        break
+def init_firebase():
+    """Inizializza Firebase usando variabile d'ambiente o file locale"""
+    # Prova a leggere dalla variabile d'ambiente (Render)
+    firebase_key_json = os.environ.get('FIREBASE_KEY')
+    
+    if firebase_key_json:
+        try:
+            cred_dict = json.loads(firebase_key_json)
+            cred = credentials.Certificate(cred_dict)
+            if not firebase_admin._apps:
+                firebase_admin.initialize_app(cred)
+            return firestore.client()
+        except Exception as e:
+            st.error(f"❌ Errore Firebase (variabile): {e}")
+            return None
+    
+    # Se non c'è variabile, prova con file locale (per test)
+    for f in os.listdir('.'):
+        if f.endswith('.json') and f != 'dati_locali.json':
+            try:
+                cred = credentials.Certificate(f)
+                if not firebase_admin._apps:
+                    firebase_admin.initialize_app(cred)
+                return firestore.client()
+            except:
+                pass
+    
+    st.error("❌ Firebase non configurato! Contatta l'amministratore.")
+    return None
 
-if key_file:
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(key_file)
-        firebase_admin.initialize_app(cred)
-    db = firestore.client()
-else:
-    st.error("❌ File Firebase non trovato!")
+db = init_firebase()
+if db is None:
     st.stop()
 
 # ========== DATI ==========
